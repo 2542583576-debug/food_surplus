@@ -1,97 +1,50 @@
-# 🌱 惜食余量魔法袋 · Food Surplus
+# 惜食余量魔法袋
 
-> **让当日余量食物遇见需要它的人。**
-> 商家把当天卖不完、却依然新鲜的食物装进"魔法袋"低价出售；顾客省钱买到美味，商家减少损耗，环境少一份浪费。每次领取自动累积成"环保账本"里的减碳记录。
+找实习期间做的一个小项目。想法挺朴素的：面包店、便利店每天打烊前总有些还没坏、但当天卖不掉的东西，直接扔了可惜。我就做了个网页，让商家把这些食物打包成"魔法袋"低价挂出来，住附近的人按时段去自提。
 
-![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009485?logo=fastapi&logoColor=white)
-![Vue](https://img.shields.io/badge/Vue-3.x-42B883?logo=vue.js&logoColor=white)
-![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
-![License](https://img.shields.io/badge/license-MIT-green)
+后端用 FastAPI + MySQL，前端 Vue 3。顾客下单会拿到一个 6 位核销码，到店给商家核销，核销完自动往"环保账本"里记一条减碳数据。商家那边能新建魔法袋、看门店订单、做核销。
 
-一个**可直接部署上线**的全栈网页应用。后端 FastAPI + MySQL（Redis 可选降级），前端 Vue 3 + Vite + Element Plus。
+这个 README 主要是写给你看的，方便你自己动手跑起来验证。想先了解做了什么就看"功能"，想直接跑就看"怎么跑起来"，想看我当时踩的坑就看"我卡最久的一个问题"。
 
----
+## 功能
 
-## ⭐ 项目亮点（30 秒速览）
+顾客登录后在魔法袋广场看到附近门店挂出来的袋子，挑一个预订，下单拿到 6 位核销码；到店把码给商家，商家核销，这次领取就记进你的环保账本里——每个魔法袋按 0.5kg 食物、1.2kg 碳估算。核销完还会有一条站内通知提醒你。
 
-- **完整业务闭环**：下单 → 核销 → 碳账本 → 站内通知，一次操作贯穿多个模块，不是孤立的 CRUD。
-- **工程化到位**：JWT 认证、幂等初始化脚本、配置全走环境变量、`/health` + `/ready` 健康检查、Redis 不可用自动降级、结构化日志 + 请求 ID。
-- **质量保障**：16 项接口冒烟测试 + 15 项端到端闭环测试，全部通过。
-- **开箱即用**：Windows 一键启动脚本、Docker Compose 一键部署，含前后端分离与 Nginx 反向代理。
-- **真实业务约束**：库存原子扣减、订单 15 分钟超时自动释放、核销状态机校验 + 幂等防护。
+商家端就是登录、新建和编辑魔法袋（可以传封面图）、查看并核销门店订单、看自提门店信息（地址可复制、可跳转导航）这几件事。
 
----
+## 我卡最久的一个问题
 
-## 🧩 技术栈
+下单这块我调试了挺久。魔法袋是按门店挂出来的，但订单表里得记"哪个商家来核销这个单"。一开始我直接把魔法袋上的 merchant_id 写到订单里，结果发现是空的——顾客这边下单成功了，商家那边的订单列表却根本看不到这个单，核销也就没法做。
+
+后来发现应该从魔法袋所属的 store_id 反查这家门店的管理员（role=1、is_active 的），再把管理员 ID 写进订单。改完之后下单 → 商家可见 → 核销 → 碳账本这条线才算真的通了。代码在 `backend/app/services/order_service.py`，我留了一行注释标着这是闭环的关键点。
+
+## 技术栈
 
 | 层 | 技术 |
 |---|---|
-| 前端 | Vue 3 · Vite · Element Plus · Pinia · Axios |
-| 后端 | FastAPI · SQLAlchemy · Pydantic · JWT · Uvicorn |
-| 存储 | MySQL 8.0 · Redis（可选，自动降级为内存） |
-| 部署 | Docker Compose · Nginx · 多阶段构建 |
+| 前端 | Vue 3、Vite、Element Plus、Pinia、Axios |
+| 后端 | FastAPI、SQLAlchemy、Pydantic、JWT、Uvicorn |
+| 存储 | MySQL 8.0、Redis（可选，连不上会自动降级成内存） |
+| 部署 | Docker Compose、Nginx、多阶段构建 |
 
----
+## 怎么跑起来
 
-## 🔄 业务闭环（核心设计）
+### 方式 A：本机启动（不用 Docker，Windows 上推荐这个）
 
-```mermaid
-flowchart LR
-    A[商家发布魔法袋\n定价/库存/领取时段] --> B[顾客浏览广场\n下单预订]
-    B --> C[服务端生成\n6位核销码\n原子扣库存]
-    C --> D[顾客到店\n出示核销码]
-    D --> E[商家核销\n状态校验]
-    E --> F[生成碳减排记录\n更新环保账本]
-    E --> G[推送站内通知]
-    F --> H[三方共赢:\n顾客省钱·商家减损·环境减碳]
-    G --> H
-```
+前置条件：装好 Python 3.10+ 和 Node.js 18+，MySQL 已经在跑，并把连接信息填进 `backend/.env`（可以照着 `backend/.env.example` 改）。
 
-**关键实现**：魔法袋下单时 `merchant_id` 为空会导致商家看不到订单。解决方案是**从魔法袋所属门店反查管理员**并写入订单——这是本项目修复的核心业务闭环 bug（见 `backend/app/services/order_service.py`）。
-
----
-
-## 🎬 面试演示动线（照着操作即可）
-
-用**无痕窗口**打开前端，先在 Swagger（`http://127.0.0.1:8000/docs`）演示后端，再切前端演示界面。
-
-| 步骤 | 操作 | 期望结果 / 讲解点 |
-|---|---|---|
-| 1 | `GET /health`、`GET /ready` | 200，健康检查分层 |
-| 2 | `POST /api/v1/auth/login` 填 `admin/admin123` | 200，JWT 含 ID/角色/门店 |
-| 3 | 右上角 Authorize 用 **HTTPBearer** 栏粘贴 token | 带锁接口解锁（⚠️ 不要用会报 500 的 OAuth2 弹窗） |
-| 4 | `POST /api/v1/orders/create` | **201**，记下响应里的 `id`（数字）和 `verify_code`（6 位码） |
-| 5 | `POST /api/v1/merchant/orders/{id}/verify` | 200，`status` 从 1→2；⭐讲核心闭环 bug 的修复 |
-| 6 | `GET /api/carbon/platform/summary` | 200，`total_order_count` +1，一次核销贯穿三模块 |
-
-> **演示账号**：顾客 `user / user123`　商家 `admin / admin123`（登录页有一键填入）
->
-> **避坑**：下单请求体不要用 Swagger 默认的 `"order_no":"string"`（会撞唯一约束报 500），只传 `bag_id`、`customer_phone`、`customer_name`、`pay_method`；订单 15 分钟未核销会超时，需重新下单再核销。
-
-前端演示：顾客登录 → 魔法袋广场预订拿核销码 → 退出换商家登录 → 门店订单核销 → 回到顾客看环保账本与通知铃铛。
-
----
-
-## 🚀 快速启动
-
-### 方式 A：本机一键启动（无需 Docker，Windows 推荐）
-
-前置：安装 **Python 3.10+**、**Node.js 18+**，且 **MySQL 已运行**，并把连接信息填入 `backend/.env`（可参考 `backend/.env.example`）。
-
-双击项目根目录的 **`start-local.bat`**。脚本自动完成：清理占用端口的旧进程 → 创建虚拟环境 → 装依赖 → 初始化数据库 → 启动前后端 → 等待就绪 → 自动打开浏览器（前端 + 后端文档两个标签页）。
+然后双击项目根目录的 `start-local.bat`。这个脚本会依次清理占着端口的旧进程、建虚拟环境、装依赖、初始化数据库、启动前后端，等两边都就绪了自动打开浏览器（前端和后端接口文档两个标签页）。
 
 启动后访问：
-- 前端页面：<http://127.0.0.1:5173>
-- 接口文档：<http://127.0.0.1:8000/docs>
+- 前端页面：http://127.0.0.1:5173
+- 接口文档：http://127.0.0.1:8000/docs
 
-**停止服务**：双击 **`stop-local.bat`**（按端口精准关闭前后端进程）。
+要停服务就双击 `stop-local.bat`，它按端口把前后端进程关掉。
 
-> 启动/停止脚本为纯 ASCII + CRLF 编码，已规避中文在 cmd 中乱码导致的一闪而过问题。
+顺带说一句，启动和停止脚本我是用纯 ASCII + CRLF 编码写的，因为之前中文提示在 cmd 里按 GBK 解读，双击就一闪而过，排查了好一会儿才定位到是编码问题。
 
 <details>
-<summary>手动启动（脚本异常时的备选）</summary>
+<summary>手动启动（脚本出问题时可以这么试）</summary>
 
 ```bat
 cd /d D:\food_surplus\backend
@@ -104,39 +57,40 @@ npm run dev -- --host 127.0.0.1
 ```
 </details>
 
-### 方式 B：Docker 一键部署（推荐上线）
+### 方式 B：Docker Compose
 
 ```bash
-# 1. 生成配置文件并修改密钥（SECRET_KEY、MYSQL_PASSWORD、CORS_ORIGINS）
+# 1. 生成配置文件，把里面的 SECRET_KEY、MYSQL_PASSWORD、CORS_ORIGINS 改成你自己的
 cp backend/.env.example .env
 
-# 2. 一键启动全部服务（MySQL + Redis + 后端 + 前端）
+# 2. 启动全部服务（MySQL + Redis + 后端 + 前端）
 docker compose up -d --build
 ```
 
-访问 `http://服务器IP`（前端 80 端口）、`http://服务器IP:8000/docs`（接口文档）。
+然后访问 `http://服务器IP`（前端走 80 端口），接口文档在 `http://服务器IP:8000/docs`。
 
----
+## 演示的时候怎么操作
 
-## ✅ 用户功能
+建议用无痕窗口打开前端，先在 Swagger（http://127.0.0.1:8000/docs）把后端过一遍，再切到前端演示界面。
 
-**顾客端**：登录/注册 → 魔法袋广场浏览 → 预订拿 6 位核销码 → 到店自提 → 环保账本看减碳记录 → 站内通知。
+| 步骤 | 操作 | 期望结果 / 讲解点 |
+|---|---|---|
+| 1 | `GET /health`、`GET /ready` | 200，两个健康检查是分层的 |
+| 2 | `POST /api/v1/auth/login` 填 `admin/admin123` | 200，JWT 里带了 ID、角色、门店 |
+| 3 | 右上角 Authorize，在 HTTPBearer 栏粘贴 token | 带锁的接口解锁了（注意别用 OAuth2 那个弹窗，会报 500） |
+| 4 | `POST /api/v1/orders/create` | 201，把响应里的 `id`（数字）和 `verify_code`（6 位码）记下来 |
+| 5 | `POST /api/v1/merchant/orders/{id}/verify` | 200，`status` 从 1 变成 2；这里可以讲上面那个 merchant_id 的问题 |
+| 6 | `GET /api/carbon/platform/summary` | 200，`total_order_count` +1，一次核销串起了三个模块 |
 
-**商家端**：登录 → 新建/编辑魔法袋（可传封面图） → 门店订单查看与核销 → 自提门店信息（地址复制/导航）。
+演示账号：顾客 `user / user123`，商家 `admin / admin123`，登录页有一键填入。
 
----
+两个容易踩的坑：下单请求体不要用 Swagger 默认的 `"order_no":"string"`，会撞唯一约束报 500，只传 `bag_id`、`customer_phone`、`customer_name`、`pay_method` 就行；另外订单 15 分钟没核销会超时，超时了就重新下一单再核销。
 
-## 🛠 技术实现与工程化
+前端可以这么走一遍：顾客登录 → 魔法袋广场预订拿核销码 → 退出换商家登录 → 门店订单核销 → 回到顾客看环保账本和通知铃铛。
 
-- **业务闭环**：下单反查门店管理员写入 `merchant_id`，打通商家可见性与核销链路。
-- **数据一致性**：订单号/核销码服务端生成；事务内原子扣减库存；15 分钟超时后台任务自动释放库存；核销状态机校验 + 幂等防护。
-- **认证安全**：JWT 载荷用用户 ID（避免类型不一致的 500），携带角色与门店 ID；bcrypt 密码哈希。
-- **可部署性**：配置全部走环境变量；幂等初始化脚本（建表/补列/种子数据可重复执行）；Redis 不可用自动降级；`/health` `/ready` 健康检查；CORS 显式来源；请求 ID + 结构化日志。
-- **增强功能**：图片上传（本地持久化 + 类型白名单 + 5MB 限制）、自提门店导航、支付状态标识、站内通知。
+## 测试怎么跑的
 
----
-
-## 🧪 测试
+在 backend 目录下执行：
 
 ```bash
 # 后端接口冒烟测试（16 项）
@@ -149,11 +103,9 @@ cd backend && .venv\Scripts\python.exe tests\smoke_test.py
 cd frontend && npm run build
 ```
 
-**结果**：冒烟 16 项 + 端到端 15 项全部通过，前端构建通过。
+两组测试我都跑过，能过：冒烟 16 项、端到端 15 项，前端构建也过了。端到端那条是从下单一路走到商家可见、核销、碳账本、通知、门店的，能把前面说的主线整个串一遍。
 
----
-
-## 📁 目录结构
+## 目录结构
 
 ```
 food_surplus/
@@ -178,13 +130,8 @@ food_surplus/
         └── styles/         # 环保主题样式
 ```
 
----
+## 还有哪些没做完
 
-## 🔒 上线前检查清单
+先说实话："在线支付"目前只是个状态标记，没有接微信或者支付宝，不会真的扣钱。这块我没做完，说出来免得你误会。
 
-1. 修改 `SECRET_KEY`（随机长字符串）、`MYSQL_PASSWORD`、默认账号密码。
-2. `CORS_ORIGINS` 只保留真实前端域名。
-3. 确认 `DEBUG=false`。
-4. 为 MySQL 与上传卷 `upload_data` 配置定时备份。
-5. 多实例部署时启用 Redis 并共享同一 `SECRET_KEY`。
-6. 真实在线支付需接入微信/支付宝商户（当前"在线支付"为状态标识演示，不涉及真实资金）。
+真要部署到服务器的话还有几件事得处理：把 `.env` 里的 SECRET_KEY 换成随机长字符串，改掉 MYSQL_PASSWORD 和种子数据里的默认账号密码；CORS_ORIGINS 只留真实的前端域名；DEBUG 关掉。MySQL 和上传的 `upload_data` 目录要做定时备份，不然数据丢了没法找回来。如果开多个实例，得启用 Redis 并让几个实例共用同一个 SECRET_KEY，否则登录状态对不上。
