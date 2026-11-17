@@ -1,0 +1,49 @@
+# ===== 敏感信息：绝不上传 =====
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# ===== Node / 前端 =====
+node_modules/
+dist/
+.vite/
+*.local
+
+# ===== 运行期数据 =====
+uploads/
+backend/uploads/
+*.log
+
+# ===== 数据库 / 缓存 =====
+*.db
+*.sqlite
+*.sqlite3
+*.sql.bak
+
+# ===== 编辑器 / 系统 =====
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ===== 项目工具数据 =====
+.workbuddy/
+startlog*.txt
+
+# ===== 兼容：保留 .gitkeep 占位文件 =====
+!**/.gitkeep

@@ -1,0 +1,16 @@
+# 统一换行符，避免跨平台 diff 噪音
+* text=auto
+
+# 脚本文件强制 CRLF（Windows bat 必须）
+*.bat text eol=crlf
+
+# 代码与配置强制 LF
+*.py text eol=lf
+*.js text eol=lf
+*.vue text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.ini text eol=lf
